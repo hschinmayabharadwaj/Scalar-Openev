@@ -1,0 +1,32 @@
+name: supportops-openenv
+version: 1.0.0
+description: |
+  A real-world customer support triage simulator where an AI agent must classify priority,
+  route tickets, draft customer responses, and resolve cases with deterministic task graders.
+author: chinmayabharadwajhs
+tags:
+  - openenv
+  - customer-support
+  - evaluation
+entrypoint:
+  type: api
+  command: uvicorn server.app:app --host 0.0.0.0 --port 7860
+api:
+  base_url: http://localhost:7860
+  endpoints:
+    reset: /reset
+    step: /step
+    state: /state
+    tasks: /tasks
+observation_model: Observation
+action_model: Action
+reward_model: Reward
+episode:
+  max_steps: 8
+tasks:
+  - task_id: task_easy_password
+    difficulty: easy
+  - task_id: task_medium_double_charge
+    difficulty: medium
+  - task_id: task_hard_enterprise_outage
+    difficulty: hard
