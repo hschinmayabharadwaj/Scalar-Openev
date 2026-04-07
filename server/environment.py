@@ -24,7 +24,14 @@ class SupportTriageEnvironment:
 	def __init__(self) -> None:
 		self.max_steps = 8
 		self._tasks = self._build_tasks()
-		self._task_order = ["task_easy_password", "task_medium_double_charge", "task_hard_enterprise_outage"]
+		self._task_order = [
+			"task_easy_password",
+			"task_easy_feature_question",
+			"task_medium_double_charge",
+			"task_medium_api_rate_limit",
+			"task_hard_enterprise_outage",
+			"task_hard_data_breach_report",
+		]
 		self._task_index = 0
 		self._state: Optional[EnvironmentState] = None
 
@@ -53,6 +60,29 @@ class SupportTriageEnvironment:
 					reply_keywords=["reset link", "clear cache", "confirm if resolved"],
 				),
 			),
+			"task_easy_feature_question": TaskDefinition(
+				task_id="task_easy_feature_question",
+				difficulty="easy",
+				title="Feature Inquiry",
+				objective="Answer a simple product question and direct user to documentation.",
+				ticket=Ticket(
+					ticket_id="CS-1050",
+					customer_name="Marcus Chen",
+					customer_tier="free",
+					subject="How do I export my data?",
+					message=(
+						"Hi, I want to download all my project data as a CSV file. "
+						"Is this possible? I looked in settings but couldn't find it."
+					),
+					product_area="data_export",
+				),
+				target=TaskTarget(
+					priority="low",
+					queue="general",
+					resolution_code="resolved_with_documentation",
+					reply_keywords=["export", "settings", "documentation"],
+				),
+			),
 			"task_medium_double_charge": TaskDefinition(
 				task_id="task_medium_double_charge",
 				difficulty="medium",
@@ -74,6 +104,30 @@ class SupportTriageEnvironment:
 					queue="billing",
 					resolution_code="billing_investigation_opened",
 					reply_keywords=["invoice", "refund", "24 hours"],
+				),
+			),
+			"task_medium_api_rate_limit": TaskDefinition(
+				task_id="task_medium_api_rate_limit",
+				difficulty="medium",
+				title="API Rate Limit Issue",
+				objective="Diagnose a technical issue and provide workaround while investigating.",
+				ticket=Ticket(
+					ticket_id="CS-2101",
+					customer_name="Sarah Kim",
+					customer_tier="pro",
+					subject="Getting 429 errors on API calls",
+					message=(
+						"Our integration started getting rate limit errors yesterday. "
+						"We haven't changed anything on our end. Our batch jobs are failing "
+						"and we need this resolved for our Monday deployment."
+					),
+					product_area="api",
+				),
+				target=TaskTarget(
+					priority="high",
+					queue="technical",
+					resolution_code="engineering_investigation",
+					reply_keywords=["rate limit", "monitoring", "workaround"],
 				),
 			),
 			"task_hard_enterprise_outage": TaskDefinition(
@@ -99,6 +153,33 @@ class SupportTriageEnvironment:
 					queue="technical",
 					resolution_code="incident_escalated",
 					reply_keywords=["incident", "war room", "next update in 15 minutes"],
+				),
+			),
+			"task_hard_data_breach_report": TaskDefinition(
+				task_id="task_hard_data_breach_report",
+				difficulty="hard",
+				title="Potential Data Breach Report",
+				objective=(
+					"Handle a sensitive security report from an enterprise customer requiring immediate escalation to security team."
+				),
+				ticket=Ticket(
+					ticket_id="CS-9999",
+					customer_name="David Park",
+					customer_tier="enterprise",
+					subject="URGENT: Suspicious access to our organization data",
+					message=(
+						"We detected unauthorized access attempts to our company workspace from IP addresses "
+						"in a foreign country. Several admin accounts show login attempts we don't recognize. "
+						"This may be a breach. We need your security team involved immediately and an audit log "
+						"of all access to our account in the last 7 days."
+					),
+					product_area="security",
+				),
+				target=TaskTarget(
+					priority="urgent",
+					queue="trust_and_safety",
+					resolution_code="security_incident_opened",
+					reply_keywords=["security team", "audit log", "immediately"],
 				),
 			),
 		}

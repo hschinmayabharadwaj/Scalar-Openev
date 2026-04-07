@@ -26,7 +26,13 @@ episode:
 tasks:
   - task_id: task_easy_password
     difficulty: easy
+  - task_id: task_easy_feature_question
+    difficulty: easy
   - task_id: task_medium_double_charge
     difficulty: medium
+  - task_id: task_medium_api_rate_limit
+    difficulty: medium
   - task_id: task_hard_enterprise_outage
+    difficulty: hard
+  - task_id: task_hard_data_breach_report
     difficulty: hard

@@ -1,5 +1,0 @@
-# Legacy filename kept for compatibility. Primary spec file: openenv.yaml
-name: supportops-openenv
-version: 1.0.0
-description: Customer support triage OpenEnv environment.
-primary_spec: openenv.yaml

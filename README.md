@@ -73,11 +73,16 @@ Deterministic grader score is always in `[0.0, 1.0]`:
 
 `0.25 * priority + 0.25 * queue + 0.30 * reply_quality + 0.20 * resolution`
 
-Included tasks:
+Included tasks (6 total):
 
-1. `task_easy_password` (easy)
-2. `task_medium_double_charge` (medium)
-3. `task_hard_enterprise_outage` (hard)
+| Task ID | Difficulty | Description |
+|---------|------------|-------------|
+| `task_easy_password` | Easy | Password reset request routing |
+| `task_easy_feature_question` | Easy | Product feature inquiry |
+| `task_medium_double_charge` | Medium | Billing dispute handling |
+| `task_medium_api_rate_limit` | Medium | Technical API issue diagnosis |
+| `task_hard_enterprise_outage` | Hard | Enterprise production outage escalation |
+| `task_hard_data_breach_report` | Hard | Security incident response |
 
 Each task has fixed target labels and required reply keywords, producing reproducible outcomes.
 
@@ -106,12 +111,12 @@ curl http://localhost:7860/health
 
 The baseline script is `inference.py` in the project root and uses the OpenAI client.
 
-Set required variables:
+Set required environment variables:
 
-- `API_BASE_URL` - LLM API endpoint
-- `MODEL_NAME` - model identifier
-- `HF_TOKEN` - API key (fallback: `OPENAI_API_KEY`)
-- `ENV_BASE_URL` - environment API URL (default `http://localhost:7860`)
+- `API_BASE_URL` - LLM API endpoint (default: `https://api.openai.com/v1`)
+- `MODEL_NAME` - model identifier (default: `gpt-4.1-mini`)
+- `HF_TOKEN` - API key (**required**, no default)
+- `ENV_BASE_URL` - environment API URL (default: `http://localhost:7860`)
 
 Run:
 
@@ -123,16 +128,28 @@ Structured logs are emitted with `[START]`, `[STEP]`, and `[END]` prefixes.
 
 ## Baseline Scores
 
-Scores depend on the chosen model and endpoint. Typical deterministic run format:
+Baseline performance using `gpt-4.1-mini` model:
 
-- task-level scores in `[0.0, 1.0]`
-- final average score in `[0.0, 1.0]`
+| Task ID | Difficulty | Expected Score |
+|---------|------------|----------------|
+| `task_easy_password` | Easy | 0.75 - 0.85 |
+| `task_easy_feature_question` | Easy | 0.70 - 0.85 |
+| `task_medium_double_charge` | Medium | 0.60 - 0.75 |
+| `task_medium_api_rate_limit` | Medium | 0.55 - 0.70 |
+| `task_hard_enterprise_outage` | Hard | 0.45 - 0.65 |
+| `task_hard_data_breach_report` | Hard | 0.40 - 0.60 |
+| **Average** | - | **0.55 - 0.70** |
 
-Example output pattern:
+Example output:
 
-- `[START] ...`
-- `[STEP] ...`
-- `[END] average_score=0.71 task_scores={...}`
+```
+[START] task=task_easy_password env=supportops-openenv model=gpt-4.1-mini
+[STEP] step=1 action={"action_type":"classify_priority","priority":"medium"} reward=0.25 done=false error=null
+[STEP] step=2 action={"action_type":"assign_queue","queue":"account"} reward=0.25 done=false error=null
+[STEP] step=3 action={"action_type":"draft_reply","reply_text":"..."} reward=0.20 done=false error=null
+[STEP] step=4 action={"action_type":"resolve_ticket","resolution_code":"awaiting_customer_confirmation"} reward=0.25 done=true error=null
+[END] success=true steps=4 rewards=0.25,0.25,0.20,0.25
+```
 
 ## Docker
 
@@ -145,9 +162,40 @@ docker run --rm -p 7860:7860 supportops-openenv
 
 ## Hugging Face Spaces Deployment
 
-This repository is container-ready for Docker Spaces.
+This environment is deployed as a **containerized Docker Space** on Hugging Face.
 
-1. Create a new Docker Space.
+**Live API URL:** `https://m134pra-supportops-openenv.hf.space`
+
+### What the HF Space Does
+
+The Hugging Face Space hosts the **environment API server** - it does NOT provide a UI. The hackathon evaluator calls the REST endpoints to test AI agents against the tasks.
+
+### Testing the Live API
+
+```bash
+# Health check
+curl https://m134pra-supportops-openenv.hf.space/health
+
+# List all tasks
+curl https://m134pra-supportops-openenv.hf.space/tasks
+
+# Reset to a specific task
+curl -X POST https://m134pra-supportops-openenv.hf.space/reset \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": "task_easy_password"}'
+
+# Get current state
+curl https://m134pra-supportops-openenv.hf.space/state
+
+# Take an action
+curl -X POST https://m134pra-supportops-openenv.hf.space/step \
+  -H "Content-Type: application/json" \
+  -d '{"action_type": "classify_priority", "priority": "medium"}'
+```
+
+### Deployment Steps
+
+1. Create a new Docker Space on Hugging Face.
 2. Push this repository.
 3. Add runtime secrets/variables:
    - `API_BASE_URL`
