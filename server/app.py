@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
 
 from models import Action, ResetRequest, StepResponse
@@ -44,3 +45,12 @@ def state() -> dict:
 		return {"state": env.state().model_dump()}
 	except RuntimeError as exc:
 		raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def main() -> None:
+	"""Entry point for the server."""
+	uvicorn.run(app, host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+	main()
