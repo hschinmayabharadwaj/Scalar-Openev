@@ -115,7 +115,7 @@ Set required environment variables:
 
 - `API_BASE_URL` - LLM API endpoint
 - `MODEL_NAME` - model identifier
-- `HF_TOKEN` - API key (fallback: `GEMINI_API_KEY`)
+- `OPENAI_API_KEY` - API key (fallback: `HF_TOKEN`)
 - `ENV_BASE_URL` - environment API URL (default `http://localhost:7860`)
 
 Run:
@@ -209,7 +209,7 @@ curl -X POST https://m134pra-supportops-openenv.hf.space/step \
 3. Add runtime secrets/variables:
    - `API_BASE_URL`
    - `MODEL_NAME`
-   - `HF_TOKEN`
+  - `OPENAI_API_KEY`
 4. Ensure the Space has the `openenv` tag.
 
 ## API Summary
