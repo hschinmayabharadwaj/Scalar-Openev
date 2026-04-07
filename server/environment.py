@@ -286,47 +286,67 @@ class SupportTriageEnvironment:
 		reason = "Action accepted."
 
 		action_signature = action.model_dump_json(exclude_none=True)
+		
+		# HEAVY PENALTY: Repeated identical actions (potential infinite loop)
 		if state.action_history and state.action_history[-1] == action_signature:
-			penalty += 0.03
-			reason = "Repeated action penalty."
+			penalty += 0.10  # Increased from 0.03
+			reason = "Heavy penalty: Repeated identical action (potential loop)."
+		
+		# HEAVY PENALTY: Multiple consecutive repeats
+		if len(state.action_history) >= 2 and all(a == action_signature for a in state.action_history[-2:]):
+			penalty += 0.15  # Additional penalty for 3+ repeats
+			reason = "Severe penalty: Multiple repeated actions detected."
 
 		if action.action_type == "classify_priority":
 			if action.priority is None:
-				penalty += 0.05
+				penalty += 0.08  # Increased from 0.05
 				reason = "Missing priority value."
+			elif state.current_priority is not None:
+				penalty += 0.05  # Penalty for re-classifying
+				reason = "Penalty: Priority already set, unnecessary re-classification."
 			else:
 				state.current_priority = action.priority
 		elif action.action_type == "assign_queue":
 			if action.queue is None:
-				penalty += 0.05
+				penalty += 0.08  # Increased from 0.05
 				reason = "Missing queue value."
+			elif state.current_queue is not None:
+				penalty += 0.05  # Penalty for re-assigning
+				reason = "Penalty: Queue already assigned, unnecessary re-assignment."
 			else:
 				state.current_queue = action.queue
 		elif action.action_type == "draft_reply":
 			if not action.reply_text or len(action.reply_text.strip()) < 20:
-				penalty += 0.04
+				penalty += 0.08  # Increased from 0.04
 				reason = "Reply too short to be useful."
 			else:
 				state.reply_draft = action.reply_text.strip()
 		elif action.action_type == "add_internal_note":
 			if not action.note:
-				penalty += 0.03
+				penalty += 0.05  # Increased from 0.03
 				reason = "Internal note is empty."
 			else:
 				state.internal_notes.append(action.note.strip())
 		elif action.action_type == "resolve_ticket":
-			state.resolved = True
-			if action.resolution_code:
-				state.resolution_code = action.resolution_code
+			if not state.current_priority or not state.current_queue:
+				penalty += 0.12  # HEAVY: Resolving without triage
+				reason = "Heavy penalty: Cannot resolve without priority and queue set."
+			elif not state.reply_draft:
+				penalty += 0.10  # HEAVY: Resolving without customer reply
+				reason = "Heavy penalty: Cannot resolve without drafting customer reply."
 			else:
-				penalty += 0.05
-				reason = "Resolution requires resolution_code."
+				state.resolved = True
+				if action.resolution_code:
+					state.resolution_code = action.resolution_code
+				else:
+					penalty += 0.08  # Increased from 0.05
+					reason = "Resolution requires resolution_code."
 		elif action.action_type == "noop":
-			penalty += 0.02
+			penalty += 0.06  # Increased from 0.02
 			reason = "No-op penalty to discourage stalling."
 		else:
-			penalty += 0.08
-			reason = "Unknown action penalty."
+			penalty += 0.15  # Increased from 0.08
+			reason = "Unknown action type - severe penalty."
 
 		state.step_count += 1
 		state.action_history.append(action_signature)

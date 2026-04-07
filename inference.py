@@ -38,41 +38,106 @@ def log_step(
     )
 
 
-def log_end(success: bool, steps: int, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     """Emit [END] line per hackathon spec."""
     success_str = "true" if success else "false"
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={success_str} steps={steps} rewards={rewards_str}", flush=True)
+    print(f"[END] success={success_str} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 
 def call_llm_action(client: OpenAI, observation: Dict[str, Any]) -> Dict[str, Any]:
     """Call the LLM to decide the next action."""
-    prompt = (
-        "You are a customer support triage agent. Return ONLY valid JSON with keys matching this schema: "
-        "{action_type, priority?, queue?, reply_text?, note?, resolution_code?}. "
-        "Choose one best next action for progress.\n"
-        f"Observation:\n{json.dumps(observation, indent=2)}"
-    )
+    system_prompt = """You are an expert customer support triage agent. Your job is to:
+1. Classify ticket priority (low/medium/high/urgent)
+2. Assign to correct queue (billing/technical/account/trust_and_safety/general)
+3. Draft a helpful customer reply with key information
+4. Resolve with appropriate resolution code
+
+IMPORTANT GUIDELINES:
+- For enterprise customers with outages: priority=urgent, queue=technical
+- For billing issues: queue=billing
+- For security/breach reports: priority=urgent, queue=trust_and_safety
+- For password/login issues: queue=account
+- Include specific keywords in replies: incident details, timeframes, next steps
+- Always resolve with a resolution_code that matches the situation
+
+Return ONLY valid JSON. One action per response."""
+
+    action_schema = """Available actions:
+- {"action_type": "classify_priority", "priority": "low|medium|high|urgent"}
+- {"action_type": "assign_queue", "queue": "billing|technical|account|trust_and_safety|general"}
+- {"action_type": "draft_reply", "reply_text": "Your detailed response to customer"}
+- {"action_type": "add_internal_note", "note": "Internal notes for team"}
+- {"action_type": "resolve_ticket", "resolution_code": "code_here"}
+
+Common resolution codes: awaiting_customer_confirmation, resolved_with_documentation, 
+billing_investigation_opened, engineering_investigation, incident_escalated, security_incident_opened"""
+
+    # Determine what actions have been taken
+    history = observation.get("action_history", [])
+    current_priority = observation.get("current_priority")
+    current_queue = observation.get("current_queue")
+    reply_draft = observation.get("reply_draft")
+    
+    status = []
+    if current_priority:
+        status.append(f"Priority set: {current_priority}")
+    if current_queue:
+        status.append(f"Queue assigned: {current_queue}")
+    if reply_draft:
+        status.append("Reply drafted")
+    
+    status_str = ", ".join(status) if status else "No actions taken yet"
+    
+    prompt = f"""{action_schema}
+
+Current ticket:
+- ID: {observation['ticket']['ticket_id']}
+- Customer: {observation['ticket']['customer_name']} ({observation['ticket']['customer_tier']} tier)
+- Subject: {observation['ticket']['subject']}
+- Message: {observation['ticket']['message']}
+- Product Area: {observation['ticket']['product_area']}
+
+Objective: {observation['objective']}
+Steps taken: {observation['step_count']}/{observation['max_steps']}
+Current status: {status_str}
+
+Decide the single best next action to maximize progress. If priority, queue, and reply are set, resolve the ticket."""
+
     response = client.chat.completions.create(
         model=MODEL_NAME,
         temperature=0,
         messages=[
-            {"role": "system", "content": "Respond with JSON only."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
     )
     content = response.choices[0].message.content or "{}"
 
+    # Clean up response - extract JSON if wrapped in markdown
+    content = content.strip()
+    if content.startswith("```"):
+        lines = content.split("\n")
+        content = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+    
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        parsed = {
-            "action_type": "draft_reply",
-            "reply_text": (
-                "We opened an incident and will share the next update in 15 minutes. "
-                "Please confirm if this helps."
-            ),
-        }
+        # Fallback action based on what's missing
+        if not current_priority:
+            parsed = {"action_type": "classify_priority", "priority": "medium"}
+        elif not current_queue:
+            parsed = {"action_type": "assign_queue", "queue": "general"}
+        elif not reply_draft:
+            parsed = {
+                "action_type": "draft_reply",
+                "reply_text": (
+                    "Thank you for contacting support. We're looking into your issue "
+                    "and will provide an update shortly. Please confirm if this helps."
+                ),
+            }
+        else:
+            parsed = {"action_type": "resolve_ticket", "resolution_code": "awaiting_customer_confirmation"}
 
     if "action_type" not in parsed:
         parsed = {"action_type": "noop"}
@@ -81,16 +146,17 @@ def call_llm_action(client: OpenAI, observation: Dict[str, Any]) -> Dict[str, An
 
 def run_task(
     http_client: httpx.Client, llm_client: OpenAI, task_id: str, max_steps: int = 8
-) -> tuple[bool, int, List[float]]:
+) -> tuple[bool, int, float, List[float]]:
     """
     Run a single task episode.
-    Returns (success, step_count, rewards_list).
+    Returns (success, step_count, final_score, rewards_list).
     """
     log_start(task_id, MODEL_NAME)
 
     rewards: List[float] = []
     step_idx = 0
     success = False
+    final_score = 0.0
     error: Optional[str] = None
 
     try:
@@ -120,9 +186,9 @@ def run_task(
             log_step(idx, action, reward, done, error)
 
             if done:
-                # Check if task was successfully resolved
-                task_score = float(payload.get("info", {}).get("task_score", 0.0))
-                success = task_score >= 0.5  # Consider success if score >= 0.5
+                # Get the final task score from grader
+                final_score = float(payload.get("info", {}).get("task_score", 0.0))
+                success = final_score >= 0.5  # Consider success if score >= 0.5
                 break
 
     except Exception as exc:
@@ -132,8 +198,8 @@ def run_task(
         log_step(step_idx, {"action_type": "error"}, 0.0, True, error)
         rewards.append(0.0)
 
-    log_end(success, step_idx, rewards)
-    return success, step_idx, rewards
+    log_end(success, step_idx, final_score, rewards)
+    return success, step_idx, final_score, rewards
 
 
 def main() -> None:

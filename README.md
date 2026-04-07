@@ -148,7 +148,7 @@ Example output:
 [STEP] step=2 action={"action_type":"assign_queue","queue":"account"} reward=0.25 done=false error=null
 [STEP] step=3 action={"action_type":"draft_reply","reply_text":"..."} reward=0.20 done=false error=null
 [STEP] step=4 action={"action_type":"resolve_ticket","resolution_code":"awaiting_customer_confirmation"} reward=0.25 done=true error=null
-[END] success=true steps=4 rewards=0.25,0.25,0.20,0.25
+[END] success=true steps=4 score=0.95 rewards=0.25,0.25,0.20,0.25
 ```
 
 ## Docker
