@@ -250,21 +250,21 @@ class SupportTriageEnvironment:
         matched = sum(1 for kw in keywords if kw.lower() in lowered)
         return matched / max(1, len(keywords))
 
-	def _grader_score(self, state: EnvironmentState) -> float:
-		target = state.active_task.target
-		priority_score = 1.0 if state.current_priority == target.priority else 0.0
-		queue_score = 1.0 if state.current_queue == target.queue else 0.0
-		resolution_score = 1.0 if state.resolution_code == target.resolution_code else 0.0
-		reply_score = self._keyword_coverage(state.reply_draft, target.reply_keywords)
+    def _grader_score(self, state: EnvironmentState) -> float:
+        target = state.active_task.target
+        priority_score = 1.0 if state.current_priority == target.priority else 0.0
+        queue_score = 1.0 if state.current_queue == target.queue else 0.0
+        resolution_score = 1.0 if state.resolution_code == target.resolution_code else 0.0
+        reply_score = self._keyword_coverage(state.reply_draft, target.reply_keywords)
 
-		weighted = (
-			0.25 * priority_score
-			+ 0.25 * queue_score
-			+ 0.30 * reply_score
-			+ 0.20 * resolution_score
-		)
-		# Use strict clamping to ensure score is strictly between 0 and 1
-		return _strict_clamp01(weighted)
+        weighted = (
+            0.25 * priority_score
+            + 0.25 * queue_score
+            + 0.30 * reply_score
+            + 0.20 * resolution_score
+        )
+        # Use strict clamping to ensure score is strictly between 0 and 1
+        return _strict_clamp01(weighted)
 
     def _progress_signals(self, state: EnvironmentState) -> Tuple[float, Dict[str, float]]:
         target = state.active_task.target
