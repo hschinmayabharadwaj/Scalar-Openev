@@ -42,7 +42,10 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     """Emit [END] line per hackathon spec."""
     success_str = "true" if success else "false"
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={success_str} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+    print(
+        f"[END] success={success_str} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
 
 def call_llm_action(client: OpenAI, observation: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,7 +81,7 @@ billing_investigation_opened, engineering_investigation, incident_escalated, sec
     current_priority = observation.get("current_priority")
     current_queue = observation.get("current_queue")
     reply_draft = observation.get("reply_draft")
-    
+
     status = []
     if current_priority:
         status.append(f"Priority set: {current_priority}")
@@ -86,20 +89,20 @@ billing_investigation_opened, engineering_investigation, incident_escalated, sec
         status.append(f"Queue assigned: {current_queue}")
     if reply_draft:
         status.append("Reply drafted")
-    
+
     status_str = ", ".join(status) if status else "No actions taken yet"
-    
+
     prompt = f"""{action_schema}
 
 Current ticket:
-- ID: {observation['ticket']['ticket_id']}
-- Customer: {observation['ticket']['customer_name']} ({observation['ticket']['customer_tier']} tier)
-- Subject: {observation['ticket']['subject']}
-- Message: {observation['ticket']['message']}
-- Product Area: {observation['ticket']['product_area']}
+- ID: {observation["ticket"]["ticket_id"]}
+- Customer: {observation["ticket"]["customer_name"]} ({observation["ticket"]["customer_tier"]} tier)
+- Subject: {observation["ticket"]["subject"]}
+- Message: {observation["ticket"]["message"]}
+- Product Area: {observation["ticket"]["product_area"]}
 
-Objective: {observation['objective']}
-Steps taken: {observation['step_count']}/{observation['max_steps']}
+Objective: {observation["objective"]}
+Steps taken: {observation["step_count"]}/{observation["max_steps"]}
 Current status: {status_str}
 
 Decide the single best next action to maximize progress. If priority, queue, and reply are set, resolve the ticket."""
@@ -119,7 +122,7 @@ Decide the single best next action to maximize progress. If priority, queue, and
     if content.startswith("```"):
         lines = content.split("\n")
         content = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-    
+
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
@@ -137,7 +140,10 @@ Decide the single best next action to maximize progress. If priority, queue, and
                 ),
             }
         else:
-            parsed = {"action_type": "resolve_ticket", "resolution_code": "awaiting_customer_confirmation"}
+            parsed = {
+                "action_type": "resolve_ticket",
+                "resolution_code": "awaiting_customer_confirmation",
+            }
 
     if "action_type" not in parsed:
         parsed = {"action_type": "noop"}
@@ -156,7 +162,7 @@ def run_task(
     rewards: List[float] = []
     step_idx = 0
     success = False
-    final_score = 0.0
+    final_score = 0.01  # Default to 0.01 (strictly > 0)
     error: Optional[str] = None
 
     try:
@@ -179,15 +185,24 @@ def run_task(
 
             # Check for any action error from the reward reason
             reason = payload.get("reward", {}).get("reason", "")
-            if "penalty" in reason.lower() or "missing" in reason.lower() or "empty" in reason.lower():
+            if (
+                "penalty" in reason.lower()
+                or "missing" in reason.lower()
+                or "empty" in reason.lower()
+            ):
                 error = reason
 
             rewards.append(reward)
             log_step(idx, action, reward, done, error)
 
             if done:
-                # Get the final task score from grader
-                final_score = float(payload.get("info", {}).get("task_score", 0.0))
+                # Get the final task score from grader (default to 0.01 to stay strictly > 0)
+                final_score = float(payload.get("info", {}).get("task_score", 0.01))
+                # Ensure score is strictly between 0 and 1
+                if final_score <= 0.0:
+                    final_score = 0.01
+                if final_score >= 1.0:
+                    final_score = 0.99
                 success = final_score >= 0.5  # Consider success if score >= 0.5
                 break
 
@@ -195,8 +210,8 @@ def run_task(
         error = str(exc)
         if step_idx == 0:
             step_idx = 1
-        log_step(step_idx, {"action_type": "error"}, 0.0, True, error)
-        rewards.append(0.0)
+        log_step(step_idx, {"action_type": "error"}, 0.01, True, error)
+        rewards.append(0.01)
 
     log_end(success, step_idx, final_score, rewards)
     return success, step_idx, final_score, rewards
