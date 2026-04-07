@@ -11,7 +11,7 @@ from openai import OpenAI
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860").rstrip("/")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://gemini.googleapis.com/v1/gemini")
 MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
-HF_TOKEN = os.getenv("HF_TOKEN")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("GEMINI_API_KEY")
 
 ENV_NAME = "supportops-openenv"
 
@@ -137,8 +137,8 @@ def run_task(
 
 
 def main() -> None:
-    if HF_TOKEN is None:
-        raise ValueError("HF_TOKEN environment variable is required")
+    if not HF_TOKEN:
+        raise RuntimeError("Set HF_TOKEN (or GEMINI_API_KEY) before running inference.")
 
     llm_client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
     http_client = httpx.Client(timeout=60.0)

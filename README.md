@@ -113,10 +113,10 @@ The baseline script is `inference.py` in the project root and uses the OpenAI cl
 
 Set required environment variables:
 
-- `API_BASE_URL` - LLM API endpoint (default: `https://api.openai.com/v1`)
-- `MODEL_NAME` - model identifier (default: `gpt-4.1-mini`)
-- `HF_TOKEN` - API key (**required**, no default)
-- `ENV_BASE_URL` - environment API URL (default: `http://localhost:7860`)
+- `API_BASE_URL` - LLM API endpoint
+- `MODEL_NAME` - model identifier
+- `HF_TOKEN` - API key (fallback: `GEMINI_API_KEY`)
+- `ENV_BASE_URL` - environment API URL (default `http://localhost:7860`)
 
 Run:
 
@@ -153,12 +153,21 @@ Example output:
 
 ## Docker
 
-Build and run:
+Build and run locally:
 
 ```bash
-docker build -t supportops-openenv .
-docker run --rm -p 7860:7860 supportops-openenv
+docker build -t openev:update .
+docker run --rm -p 7860:7860 openev:update
 ```
+
+Or pull the pre-built image from Docker Hub with the `update` tag:
+
+```bash
+docker pull hschinmaybharadwaj05/openev:update
+docker run --rm -p 7860:7860 hschinmaybharadwaj05/openev:update
+```
+
+**Current tag: `update`** — The image is tagged as `hschinmaybharadwaj05/openev:update` on Docker Hub.
 
 ## Hugging Face Spaces Deployment
 
